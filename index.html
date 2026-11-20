@@ -115,8 +115,8 @@
   <section id="domanda" class="active" role="tabpanel">
     <div class="q-text">
       <div class="q-label">Rispondi dal telefono</div>
-      <h1 class="q-title" id="q-title">…</h1>
-      <div class="q-hint">Inquadra il QR code e scrivi una sola parola.</div>
+      <h1 class="q-title" id="q-title">In una parola, come ti senti un attimo prima di entrare?</h1>
+      <div class="q-hint" id="q-hint">Inquadra il QR code e scrivi la tua risposta.</div>
     </div>
     <div class="qr-card">
       <div id="qr"></div>
@@ -125,7 +125,7 @@
   </section>
 
   <section id="risultati" role="tabpanel">
-    <h2 class="r-title" id="r-title">…</h2>
+    <h2 class="r-title" id="r-title">In una parola, come ti senti un attimo prima di entrare?</h2>
     <div id="cloud"></div>
   </section>
 </main>
@@ -185,10 +185,24 @@ function disegnaQR(testo) {
 }
 
 async function caricaInfo() {
-  const info = await (await fetch('api.php?azione=info', { cache: 'no-store' })).json();
-  document.getElementById('q-title').textContent = info.domanda;
-  document.getElementById('r-title').textContent = info.domanda;
-  document.title = 'Word cloud — ' + info.domanda;
+  const hint = document.getElementById('q-hint');
+  let res, info = {};
+  try {
+    res = await fetch('api.php?azione=info', { cache: 'no-store' });
+    info = await res.json().catch(() => ({}));
+  } catch { res = null; }
+  if (typeof info.domanda === 'string' && info.domanda) {
+    document.getElementById('q-title').textContent = info.domanda;
+    document.getElementById('r-title').textContent = info.domanda;
+    document.title = 'Word cloud — ' + info.domanda;
+  }
+  // Se il backend non funziona lo si vede subito, prima che gli studenti provino a rispondere
+  if (!res || !res.ok) {
+    hint.style.color = '#dc2626';
+    hint.textContent = '⚠ Problema sul server: ' +
+      (info.errore || (res ? `api.php risponde con errore ${res.status}` : 'api.php non raggiungibile')).replace(/\.$/, '') +
+      '. Le risposte non verranno salvate.';
+  }
 }
 // Il QR punta a rispondi.html nella stessa cartella di questa pagina
 disegnaQR(new URL('rispondi.html', location.href).href.replace(/#.*$/, ''));
@@ -307,7 +321,9 @@ function disegnaCloud(forza) {
 // ================= Aggiornamento in tempo reale =================
 async function aggiorna() {
   try {
-    const r = await (await fetch('api.php?azione=risultati', { cache: 'no-store' })).json();
+    const res = await fetch('api.php?azione=risultati', { cache: 'no-store' });
+    const r = await res.json();
+    if (!res.ok || !Array.isArray(r.parole)) throw new Error(r.errore || 'risposta non valida');
     parole = r.parole; totale = r.totale;
     document.getElementById('totale').textContent = totale;
     document.getElementById('dot').classList.remove('off');

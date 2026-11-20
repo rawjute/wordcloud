@@ -58,13 +58,12 @@
 <div class="wrap">
   <div id="ask">
     <div class="label">Domanda</div>
-    <h1 id="domanda">…</h1>
+    <h1 id="domanda">In una parola, come ti senti un attimo prima di entrare?</h1>
     <form id="form" autocomplete="off" novalidate>
       <div class="field">
-        <input id="parola" name="parola" type="text" inputmode="text" enterkeyhint="send"
-               autocapitalize="off" autocorrect="off" spellcheck="false"
-               placeholder="Scrivi una parola" maxlength="25" aria-label="La tua parola">
-        <span class="count" id="count">0/25</span>
+        <input id="parola" name="parola" type="text" enterkeyhint="send"
+               placeholder="Scrivi la tua risposta" maxlength="20" aria-label="La tua risposta">
+        <span class="count" id="count">0/20</span>
       </div>
       <div class="msg" id="msg" role="alert"></div>
       <button id="invia" type="submit">Invia</button>
@@ -80,7 +79,7 @@
 </div>
 
 <script>
-let MAX = 25, sessione = null;
+let MAX = 20, sessione = null;
 const $ = id => document.getElementById(id);
 const input = $('parola'), msg = $('msg'), btn = $('invia');
 
@@ -93,48 +92,52 @@ function mostraFatto(parola) {
 
 function errore(t) { msg.textContent = t; input.classList.toggle('bad', !!t); }
 
+function aggiornaConteggio() { $('count').textContent = `${input.value.length}/${MAX}`; }
 input.addEventListener('input', () => {
-  // niente spazi: una parola sola
-  if (/\s/.test(input.value)) {
-    input.value = input.value.replace(/\s+/g, '');
-    errore('Una sola parola, senza spazi 🙂');
-  } else if (msg.textContent) errore('');
-  $('count').textContent = `${input.value.length}/${MAX}`;
+  if (msg.textContent) errore('');
+  aggiornaConteggio();
 });
 
 $('form').addEventListener('submit', async e => {
   e.preventDefault();
-  const parola = input.value.trim();
-  if (!parola) { errore('Scrivi una parola prima di inviare.'); input.focus(); return; }
+  const parola = input.value.trim().replace(/\s+/g, ' ');
+  if (!parola) { errore('Scrivi una risposta prima di inviare.'); input.focus(); return; }
+  if (parola.length > MAX) { errore(`Massimo ${MAX} caratteri.`); input.focus(); return; }
   btn.disabled = true; btn.textContent = 'Invio…';
   try {
-    const res = await fetch('/api/risposta', {
+    const res = await fetch('api.php?azione=risposta', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ parola })
     });
-    const r = await res.json();
-    if (!res.ok) throw new Error(r.errore || 'Errore');
-    try { localStorage.setItem('wordcloud-inviato-' + r.sessione, parola.toLowerCase()); } catch {}
-    mostraFatto(parola.toLowerCase());
+    const r = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(r.errore || `Errore del server (${res.status}).`);
+    const inviata = r.parola || parola.toLowerCase();
+    try { localStorage.setItem('wordcloud-inviato-' + r.sessione, inviata); } catch {}
+    mostraFatto(inviata);
   } catch (err) {
-    errore(err.message === 'Failed to fetch' ? 'Connessione assente: riprova.' : err.message);
+    errore(err instanceof TypeError ? 'Connessione assente: riprova.' : err.message);
   } finally {
     btn.disabled = false; btn.textContent = 'Invia';
   }
 });
 
+// La domanda e il limite sono già nella pagina: dal server prendo solo eventuali aggiornamenti
 (async () => {
   try {
-    const info = await (await fetch('/api/info', { cache: 'no-store' })).json();
-    $('domanda').textContent = info.domanda;
-    document.title = info.domanda;
-    MAX = info.maxLen; input.maxLength = MAX; $('count').textContent = `0/${MAX}`;
+    const res = await fetch('api.php?azione=info', { cache: 'no-store' });
+    const info = await res.json().catch(() => ({}));
+    if (typeof info.domanda === 'string' && info.domanda) {
+      $('domanda').textContent = info.domanda;
+      document.title = info.domanda;
+    }
+    if (Number.isInteger(info.maxLen) && info.maxLen > 0) { MAX = info.maxLen; input.maxLength = MAX; aggiornaConteggio(); }
+    if (!res.ok) { errore(info.errore || `Errore del server (${res.status}).`); return; }
     sessione = info.sessione;
     let gia = null;
     try { gia = localStorage.getItem(chiave()); } catch {}
     if (gia) mostraFatto(gia);
   } catch {
-    $('domanda').textContent = 'Impossibile contattare il server.';
+    errore('Impossibile contattare il server.');
   }
 })();
 </script>

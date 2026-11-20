@@ -1,9 +1,10 @@
-# Risposte degli studenti (non vanno nel repository)
-risposte.json
-risposte-*.json
+# PIN e impostazioni del server (non vanno nel repository)
+config.locale.php
+
+# Risposte degli studenti
+dati/*.json
+dati/.lock
 *.tmp
-wordcloud/dati/*.json
-wordcloud/dati/.lock
 
 # Impostazioni locali dell'editor
 .claude/

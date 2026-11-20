@@ -24,15 +24,30 @@ function nuovaSessione(): array
     return ['sessione' => bin2hex(random_bytes(4)), 'risposte' => []];
 }
 
+// Restituisce un messaggio se la cartella dei dati non è utilizzabile, altrimenti null
+function problemaCartella(): ?string
+{
+    $utente = function_exists('posix_geteuid') && function_exists('posix_getpwuid')
+        ? (posix_getpwuid(posix_geteuid())['name'] ?? 'www-data') : 'www-data';
+    if (!is_dir(DATA_DIR) && !@mkdir(DATA_DIR, 0750, true)) {
+        return 'La cartella dei dati ' . DATA_DIR . ' non esiste e il server web non può crearla.';
+    }
+    if (!is_writable(DATA_DIR)) {
+        return 'La cartella dei dati ' . DATA_DIR . ' non è scrivibile dall\'utente ' . $utente . '.';
+    }
+    return null;
+}
+
 // Esegue $fn con un lock esclusivo, così due invii contemporanei non si sovrascrivono
 function conLock(callable $fn)
 {
-    if (!is_dir(DATA_DIR) && !@mkdir(DATA_DIR, 0750, true)) {
-        esci(500, ['errore' => 'La cartella dei dati non esiste e non si può creare.']);
+    $problema = problemaCartella();
+    if ($problema !== null) {
+        esci(500, ['errore' => $problema]);
     }
     $fp = @fopen(DATA_DIR . '/.lock', 'c');
     if ($fp === false) {
-        esci(500, ['errore' => 'La cartella dei dati non è scrivibile dal server web (utente www-data).']);
+        esci(500, ['errore' => 'Impossibile creare il file di lock in ' . DATA_DIR . '.']);
     }
     flock($fp, LOCK_EX);
     try {
@@ -87,8 +102,12 @@ $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 switch ($azione) {
     case 'info':
+        // domanda e limite arrivano sempre, anche se la cartella dei dati ha problemi
+        $base = ['domanda' => DOMANDA, 'maxLen' => MAX_LEN];
+        $problema = problemaCartella();
+        if ($problema !== null) esci(500, $base + ['errore' => $problema]);
         $d = conLock('leggiDati');
-        esci(200, ['domanda' => DOMANDA, 'sessione' => $d['sessione'], 'maxLen' => MAX_LEN]);
+        esci(200, $base + ['sessione' => $d['sessione']]);
 
     case 'risultati':
         $d = conLock('leggiDati');
@@ -110,16 +129,14 @@ switch ($azione) {
         $testo = (string) (corpoJson()['parola'] ?? '');
         if (!preg_match('//u', $testo)) esci(400, ['errore' => 'Testo non valido.']);
         if (class_exists('Normalizer')) $testo = Normalizer::normalize($testo, Normalizer::FORM_C) ?: $testo;
+        // toglie i caratteri di controllo, riduce gli spazi multipli a uno,
         // toglie spazi e punteggiatura ai bordi, poi minuscolo
-        $parola = minuscolo(preg_replace('/^[\s\p{P}]+|[\s\p{P}]+$/u', '', $testo));
+        $testo = (string) preg_replace('/\p{Cc}+/u', ' ', $testo);
+        $testo = (string) preg_replace('/\s+/u', ' ', $testo);
+        $parola = minuscolo((string) preg_replace('/^[\s\p{P}]+|[\s\p{P}]+$/u', '', $testo));
 
-        if ($parola === '') esci(400, ['errore' => 'Scrivi una parola prima di inviare.']);
-        if (preg_match('/\s/u', $parola)) esci(400, ['errore' => 'Una sola parola, senza spazi 🙂']);
+        if ($parola === '') esci(400, ['errore' => 'Scrivi una risposta prima di inviare.']);
         if (lunghezza($parola) > MAX_LEN) esci(400, ['errore' => 'Massimo ' . MAX_LEN . ' caratteri.']);
-        // solo lettere, numeri, apostrofo e trattino
-        if (!preg_match("/^[\\p{L}\\p{M}\\p{N}'’\\-]+$/u", $parola)) {
-            esci(400, ['errore' => 'Usa solo lettere, senza simboli.']);
-        }
 
         $sessione = conLock(function () use ($parola) {
             $d = leggiDati();
