@@ -1,0 +1,2 @@
+# Impedisce di scaricare i file delle risposte dal browser (Apache 2.4)
+Require all denied

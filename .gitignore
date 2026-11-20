@@ -1,0 +1,9 @@
+# Risposte degli studenti (non vanno nel repository)
+risposte.json
+risposte-*.json
+*.tmp
+wordcloud/dati/*.json
+wordcloud/dati/.lock
+
+# Impostazioni locali dell'editor
+.claude/

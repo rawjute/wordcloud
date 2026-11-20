@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Word cloud</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #ffffff;
+    --ink: #101834;
+    --muted: #6b7290;
+    --line: #e7e9f2;
+    --accent: #4f46e5;
+    --chip: #f3f4fa;
+    --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink); font-family: var(--font);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  /* ---- Barra superiore ---- */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 28px; border-bottom: 1px solid var(--line); gap: 16px;
+  }
+  .tabs { display: flex; gap: 4px; background: var(--chip); padding: 4px; border-radius: 999px; }
+  .tab {
+    border: 0; background: transparent; font: 600 15px var(--font); color: var(--muted);
+    padding: 9px 22px; border-radius: 999px; cursor: pointer; transition: .2s;
+  }
+  .tab[aria-selected="true"] { background: #fff; color: var(--ink); box-shadow: 0 1px 4px rgba(16,24,52,.12); }
+  .tools { display: flex; align-items: center; gap: 10px; }
+  .counter { font: 600 15px var(--font); color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .counter b { color: var(--ink); font-size: 18px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 0 rgba(34,197,94,.6); animation: pulse 2s infinite; }
+  .dot.off { background: #ef4444; animation: none; }
+  @keyframes pulse { 70% { box-shadow: 0 0 0 8px rgba(34,197,94,0); } 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); } }
+  .icon-btn {
+    border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 10px;
+    height: 38px; padding: 0 12px; font: 600 14px var(--font); cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .icon-btn:hover { background: var(--chip); }
+  .icon-btn svg { width: 18px; height: 18px; }
+
+  main { flex: 1; position: relative; min-height: 0; }
+  section { position: absolute; inset: 0; display: none; }
+  section.active { display: flex; }
+
+  /* ---- Tab Domanda ---- */
+  #domanda { align-items: center; justify-content: center; gap: 6vw; padding: 4vh 6vw; }
+  .q-text { flex: 1 1 0; max-width: 900px; }
+  .q-label { font: 700 14px var(--font); text-transform: uppercase; letter-spacing: .12em; color: var(--accent); margin-bottom: 18px; }
+  .q-title { font-weight: 800; font-size: clamp(32px, 4.6vw, 76px); line-height: 1.08; letter-spacing: -0.02em; margin: 0; }
+  .q-hint { margin-top: 28px; font-size: clamp(16px, 1.5vw, 24px); color: var(--muted); font-weight: 500; }
+  .qr-card {
+    flex: 0 0 auto; background: #fff; border: 1px solid var(--line); border-radius: 24px;
+    padding: 28px; display: flex; flex-direction: column; align-items: center; gap: 16px;
+    box-shadow: 0 10px 40px rgba(16,24,52,.08);
+  }
+  #qr { width: min(34vw, 52vh); height: min(34vw, 52vh); display: grid; place-items: center; }
+  #qr svg { width: 100%; height: 100%; display: block; }
+  .qr-fallback { font-size: 15px; color: var(--muted); text-align: center; max-width: 260px; }
+  .url { font: 700 clamp(15px, 1.4vw, 22px) var(--font); color: var(--ink); text-align: center; word-break: break-all; }
+  .url-select { font: 500 13px var(--font); color: var(--muted); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; background: #fff; }
+
+  /* ---- Tab Risultati ---- */
+  #risultati { flex-direction: column; padding: 3vh 4vw 2vh; }
+  .r-title { font-weight: 800; font-size: clamp(20px, 2.2vw, 36px); letter-spacing: -0.01em; margin: 0 0 1vh; text-align: center; }
+  #cloud { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+  .word {
+    position: absolute; left: 0; top: 0; white-space: nowrap; line-height: 1; font-family: var(--font);
+    letter-spacing: -0.02em; will-change: transform;
+    transition: transform .9s cubic-bezier(.2,.8,.2,1), font-size .9s cubic-bezier(.2,.8,.2,1), opacity .6s;
+    cursor: default; user-select: none;
+  }
+  .word.enter { opacity: 0; }
+  .empty {
+    position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
+    color: var(--muted); font-size: clamp(18px, 2vw, 28px); font-weight: 600;
+  }
+  .empty small { display: block; font-size: .65em; font-weight: 500; margin-top: 8px; }
+
+  @media (max-width: 760px) {
+    header { padding: 10px 14px; flex-wrap: wrap; }
+    #domanda { flex-direction: column; gap: 28px; }
+    #qr { width: 70vw; height: 70vw; }
+    .icon-btn span { display: none; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab-domanda" aria-selected="true" data-target="domanda">Domanda</button>
+    <button class="tab" role="tab" id="tab-risultati" aria-selected="false" data-target="risultati">Risultati</button>
+  </div>
+  <div class="tools">
+    <div class="counter" title="Risposte ricevute"><span class="dot" id="dot"></span><b id="totale">0</b> risposte</div>
+    <button class="icon-btn" id="btn-full" title="Schermo intero (F)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Schermo intero</span>
+    </button>
+    <button class="icon-btn" id="btn-reset" title="Cancella tutte le risposte">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg><span>Azzera</span>
+    </button>
+  </div>
+</header>
+
+<main>
+  <section id="domanda" class="active" role="tabpanel">
+    <div class="q-text">
+      <div class="q-label">Rispondi dal telefono</div>
+      <h1 class="q-title" id="q-title">…</h1>
+      <div class="q-hint">Inquadra il QR code e scrivi una sola parola.</div>
+    </div>
+    <div class="qr-card">
+      <div id="qr"></div>
+      <div class="url" id="url"></div>
+      <select class="url-select" id="url-select" hidden title="Indirizzo di rete usato nel QR"></select>
+    </div>
+  </section>
+
+  <section id="risultati" role="tabpanel">
+    <h2 class="r-title" id="r-title">…</h2>
+    <div id="cloud"></div>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+// ================= Tab =================
+const tabs = document.querySelectorAll('.tab');
+function mostra(id) {
+  tabs.forEach(t => t.setAttribute('aria-selected', t.dataset.target === id));
+  document.querySelectorAll('section').forEach(s => s.classList.toggle('active', s.id === id));
+  history.replaceState(null, '', '#' + id);
+  if (id === 'risultati') disegnaCloud(true);
+}
+tabs.forEach(t => t.addEventListener('click', () => mostra(t.dataset.target)));
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.key === 'ArrowRight' || e.key === '2') mostra('risultati');
+  if (e.key === 'ArrowLeft' || e.key === '1') mostra('domanda');
+  if (e.key === 'f' || e.key === 'F') schermoIntero();
+});
+function schermoIntero() {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen?.();
+}
+document.getElementById('btn-full').onclick = schermoIntero;
+
+document.getElementById('btn-reset').onclick = async () => {
+  if (!confirm('Cancellare tutte le risposte e ricominciare?\n(Le risposte attuali vengono archiviate in un file sul server.)')) return;
+  await fetch('/api/azzera', { method: 'POST' });
+  parole = []; totale = 0;
+  document.getElementById('totale').textContent = '0';
+  disegnaCloud(true);
+};
+
+// ================= QR code =================
+function disegnaQR(testo) {
+  const box = document.getElementById('qr');
+  document.getElementById('url').textContent = testo.replace(/^https?:\/\//, '');
+  if (typeof qrcode !== 'function') {
+    box.innerHTML = '<div class="qr-fallback">QR non disponibile (serve internet per caricarlo).<br>Fai digitare agli studenti l\'indirizzo qui sotto.</div>';
+    return;
+  }
+  const qr = qrcode(0, 'M');
+  qr.addData(testo);
+  qr.make();
+  const n = qr.getModuleCount(), m = 2;
+  let d = '';
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += `M${c + m},${r + m}h1v1h-1z`;
+  box.innerHTML = `<svg viewBox="0 0 ${n + 2 * m} ${n + 2 * m}" shape-rendering="crispEdges"><rect width="100%" height="100%" fill="#fff"/><path d="${d}" fill="#101834"/></svg>`;
+}
+
+async function caricaInfo() {
+  const info = await (await fetch('/api/info')).json();
+  document.getElementById('q-title').textContent = info.domanda;
+  document.getElementById('r-title').textContent = info.domanda;
+  document.title = 'Word cloud — ' + info.domanda;
+
+  // Se la pagina è aperta da un IP di rete lo usa, altrimenti (localhost) prende quello rilevato dal server
+  const daQui = /^(localhost|127\.|\[::1\])/.test(location.hostname) ? null : `${location.origin}/rispondi`;
+  const opzioni = [...new Set([daQui, ...info.indirizzi].filter(Boolean))];
+  if (!opzioni.length) opzioni.push(`${location.origin}/rispondi`);
+  const sel = document.getElementById('url-select');
+  if (opzioni.length > 1) {
+    sel.hidden = false;
+    sel.innerHTML = opzioni.map(u => `<option>${u}</option>`).join('');
+    sel.onchange = () => disegnaQR(sel.value);
+  }
+  disegnaQR(opzioni[0]);
+}
+
+// ================= Word cloud =================
+const PALETTE = ['#4f46e5', '#e11d74', '#0ea5a4', '#f59e0b', '#7c3aed', '#2563eb', '#ef4444', '#16a34a', '#db2777', '#0891b2'];
+function colore(parola) {
+  let h = 0;
+  for (const ch of parola) h = (h * 31 + ch.codePointAt(0)) >>> 0;
+  return PALETTE[h % PALETTE.length];
+}
+
+let parole = [], totale = 0, firmaPrecedente = '';
+const cloud = document.getElementById('cloud');
+const nodi = new Map();          // parola -> elemento
+const ctx = document.createElement('canvas').getContext('2d');
+
+function peso(n) { return n >= 3 ? 800 : n === 2 ? 700 : 600; }
+
+function layout(lista, W, H) {
+  if (!lista.length) return [];
+  const maxN = lista[0].n, minN = lista[lista.length - 1].n;
+  // Dimensione massima in base allo spazio e al numero di parole
+  let maxF = Math.min(H * 0.32, W / Math.max(4, lista[0].parola.length * 0.62), 170);
+  if (lista.length > 30) maxF *= 0.8;
+  for (let tentativo = 0; tentativo < 14; tentativo++) {
+    const minF = Math.max(14, maxF * 0.22);
+    const placed = [];
+    let ok = true;
+    for (const w of lista) {
+      const t = maxN === minN ? 1 : Math.sqrt((w.n - minN) / (maxN - minN));
+      const size = Math.round(minF + (maxF - minF) * t);
+      ctx.font = `${peso(w.n)} ${size}px Inter, system-ui, sans-serif`;
+      const bw = ctx.measureText(w.parola).width + size * 0.35;
+      const bh = size * 1.12;
+      const pos = trovaPosto(bw, bh, placed, W, H);
+      if (!pos) { ok = false; break; }
+      placed.push({ ...w, size, x: pos.x, y: pos.y, w: bw, h: bh });
+    }
+    if (ok) return placed;
+    maxF *= 0.88;
+  }
+  return [];
+}
+
+function trovaPosto(bw, bh, placed, W, H) {
+  const cx = W / 2, cy = H / 2, ratio = W / H;
+  for (let i = 0; i < 4000; i++) {
+    const a = i * 0.32, r = 1.6 * a;
+    const x = cx + r * Math.cos(a) * Math.sqrt(ratio) - bw / 2;
+    const y = cy + r * Math.sin(a) / Math.sqrt(ratio) - bh / 2;
+    if (x < 0 || y < 0 || x + bw > W || y + bh > H) {
+      if (r > Math.max(W, H)) return null;
+      continue;
+    }
+    let collide = false;
+    for (const p of placed) {
+      if (x < p.x + p.w && x + bw > p.x && y < p.y + p.h && y + bh > p.y) { collide = true; break; }
+    }
+    if (!collide) return { x, y };
+  }
+  return null;
+}
+
+function disegnaCloud(forza) {
+  if (!document.getElementById('risultati').classList.contains('active')) return;
+  const W = cloud.clientWidth, H = cloud.clientHeight;
+  const firma = W + 'x' + H + '|' + parole.map(p => p.parola + ':' + p.n).join(',');
+  if (!forza && firma === firmaPrecedente) return;
+  firmaPrecedente = firma;
+
+  let vuoto = cloud.querySelector('.empty');
+  if (!parole.length) {
+    nodi.forEach(el => el.remove()); nodi.clear();
+    if (!vuoto) cloud.insertAdjacentHTML('beforeend', '<div class="empty"><div>In attesa delle risposte…<small>Le parole appariranno qui in tempo reale</small></div></div>');
+    return;
+  }
+  vuoto?.remove();
+
+  const pos = layout(parole, W, H);
+  // Centra verticalmente/orizzontalmente l'insieme
+  if (pos.length) {
+    const minX = Math.min(...pos.map(p => p.x)), maxX = Math.max(...pos.map(p => p.x + p.w));
+    const minY = Math.min(...pos.map(p => p.y)), maxY = Math.max(...pos.map(p => p.y + p.h));
+    const dx = (W - (maxX - minX)) / 2 - minX, dy = (H - (maxY - minY)) / 2 - minY;
+    pos.forEach(p => { p.x += dx; p.y += dy; });
+  }
+
+  const visti = new Set();
+  for (const p of pos) {
+    visti.add(p.parola);
+    let el = nodi.get(p.parola);
+    const nuovo = !el;
+    if (nuovo) {
+      el = document.createElement('span');
+      el.className = 'word enter';
+      el.textContent = p.parola;
+      el.style.color = colore(p.parola);
+      el.style.transform = `translate(${W / 2}px, ${H / 2}px) scale(.2)`;
+      cloud.appendChild(el);
+      nodi.set(p.parola, el);
+    }
+    el.title = `${p.parola}: ${p.n} ${p.n === 1 ? 'risposta' : 'risposte'}`;
+    el.style.fontWeight = peso(p.n);
+    el.style.fontSize = p.size + 'px';
+    const tx = p.x + p.size * 0.175, ty = p.y + p.size * 0.06;
+    if (nuovo) requestAnimationFrame(() => requestAnimationFrame(() => {
+      el.classList.remove('enter');
+      el.style.transform = `translate(${tx}px, ${ty}px)`;
+    }));
+    else el.style.transform = `translate(${tx}px, ${ty}px)`;
+  }
+  nodi.forEach((el, k) => { if (!visti.has(k)) { el.remove(); nodi.delete(k); } });
+}
+
+// ================= Aggiornamento in tempo reale =================
+async function aggiorna() {
+  try {
+    const r = await (await fetch('/api/risultati', { cache: 'no-store' })).json();
+    parole = r.parole; totale = r.totale;
+    document.getElementById('totale').textContent = totale;
+    document.getElementById('dot').classList.remove('off');
+    disegnaCloud(false);
+  } catch {
+    document.getElementById('dot').classList.add('off');
+  }
+}
+
+let resizeTimer;
+window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => disegnaCloud(true), 150); });
+
+document.fonts?.addEventListener?.('loadingdone', () => disegnaCloud(true));
+
+(async () => {
+  mostra(location.hash === '#risultati' ? 'risultati' : 'domanda');
+  await document.fonts?.ready;
+  await caricaInfo().catch(() => {});
+  await aggiorna();
+  setInterval(aggiorna, 1500);
+})();
+</script>
+</body>
+</html>
