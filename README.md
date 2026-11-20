@@ -3,7 +3,7 @@
 Nuvola di parole in stile Mentimeter, con una sola domanda fissa:
 **"In una parola, come ti senti un attimo prima di entrare?"**
 
-- Tab **Domanda**: la domanda e un QR code.
+- Tab **Home**: la domanda e un QR code.
 - Gli studenti inquadrano il QR e rispondono dal telefono (senza login, massimo 20 caratteri).
 - Tab **Risultati**: la nuvola di parole, aggiornata in tempo reale.
 

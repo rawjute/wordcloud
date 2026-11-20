@@ -52,8 +52,8 @@
   section { position: absolute; inset: 0; display: none; }
   section.active { display: flex; }
 
-  /* ---- Tab Domanda ---- */
-  #domanda { align-items: center; justify-content: center; gap: 6vw; padding: 4vh 6vw; }
+  /* ---- Tab Home ---- */
+  #home { align-items: center; justify-content: center; gap: 6vw; padding: 4vh 6vw; }
   .q-text { flex: 1 1 0; max-width: 900px; }
   .q-label { font: 700 14px var(--font); text-transform: uppercase; letter-spacing: .12em; color: var(--accent); margin-bottom: 18px; }
   .q-title { font-weight: 800; font-size: clamp(32px, 4.6vw, 76px); line-height: 1.08; letter-spacing: -0.02em; margin: 0; }
@@ -88,7 +88,7 @@
 
   @media (max-width: 760px) {
     header { padding: 10px 14px; flex-wrap: wrap; }
-    #domanda { flex-direction: column; gap: 28px; }
+    #home { flex-direction: column; gap: 28px; }
     #qr { width: 70vw; height: 70vw; }
     .icon-btn span { display: none; }
   }
@@ -97,7 +97,7 @@
 <body>
 <header>
   <div class="tabs" role="tablist">
-    <button class="tab" role="tab" id="tab-domanda" aria-selected="true" data-target="domanda">Domanda</button>
+    <button class="tab" role="tab" id="tab-home" aria-selected="true" data-target="home">Home</button>
     <button class="tab" role="tab" id="tab-risultati" aria-selected="false" data-target="risultati">Risultati</button>
   </div>
   <div class="tools">
@@ -112,7 +112,7 @@
 </header>
 
 <main>
-  <section id="domanda" class="active" role="tabpanel">
+  <section id="home" class="active" role="tabpanel">
     <div class="q-text">
       <div class="q-label">Rispondi dal telefono</div>
       <h1 class="q-title" id="q-title">In una parola, come ti senti un attimo prima di entrare?</h1>
@@ -145,7 +145,7 @@ tabs.forEach(t => t.addEventListener('click', () => mostra(t.dataset.target)));
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   if (e.key === 'ArrowRight' || e.key === '2') mostra('risultati');
-  if (e.key === 'ArrowLeft' || e.key === '1') mostra('domanda');
+  if (e.key === 'ArrowLeft' || e.key === '1') mostra('home');
   if (e.key === 'f' || e.key === 'F') schermoIntero();
 });
 function schermoIntero() {
@@ -339,7 +339,7 @@ window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer
 document.fonts?.addEventListener?.('loadingdone', () => disegnaCloud(true));
 
 (async () => {
-  mostra(location.hash === '#risultati' ? 'risultati' : 'domanda');
+  mostra(location.hash === '#risultati' ? 'risultati' : 'home');
   await document.fonts?.ready;
   await caricaInfo().catch(() => {});
   await aggiorna();
